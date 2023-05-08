@@ -34,7 +34,7 @@ def get_video_urls_and_titles(api_key, playlist_id):
 
     request = youtube.playlistItems().list(
         part="snippet",
-        maxResults=50,
+        maxResults=500,
         playlistId=playlist_id
     )
     
@@ -57,7 +57,7 @@ def get_video_titles_from_issues(issues_url):
     soup = BeautifulSoup(response.content, "html.parser")
     issue_titles = [el.text.strip() for el in soup.find_all("a", class_="Link--primary")]
     video_titles = [title.replace("Timecodes for ", "").replace('"', '') for title in issue_titles if title.startswith("Timecodes for ")]
-    # print(video_titles)
+    print(video_titles)
     return video_titles
 
 
@@ -88,7 +88,6 @@ def process_chunk(current_text_chunk, chunk_start_time):
         presence_penalty=0,
     )
     timestamp_string = str(timedelta(seconds=int(chunk_start_time)))
-    # chunk_summary = f"\n {timestamp_string} {completion.choices[0].text}"
     polished_timestamp = f"{timestamp_string} - {clean_text(completion.choices[0].text)}".replace("\n", " ").replace("Timestamp Description: ", "")
     print(polished_timestamp)
     os.makedirs("issues", exist_ok=True)
@@ -99,29 +98,47 @@ def process_chunk(current_text_chunk, chunk_start_time):
 
 
 def process_transcript(whole_transcript):
+    """
+    Process a transcript by grouping lines into chunks and generating timestamps for each chunk.
+
+    Args:
+        whole_transcript (list): A list of dictionaries representing the transcript.
+
+    Returns:
+        str: A string containing the polished timestamps for each chunk.
+    """
+
+    # Initialize variables.
     current_text_chunk = ""
     comment_body = ""
     chunk_start_time = 0
 
+    # Iterate through each line in the transcript.
     for current_line in whole_transcript:
         if chunk_start_time == 0:
+            # Set the start time for the current chunk to the start time of the first line.
             chunk_start_time = current_line['start']
 
+        # Add the current line to the current text chunk.
         current_text_chunk += " " + current_line['text']
 
+        # If the current text chunk has more than 200 words, process it and add the polished timestamp to the comment body.
         if len(current_text_chunk.split(" ")) > 200:
             polished_timestamp = process_chunk(current_text_chunk, chunk_start_time)
             comment_body += f"\n{polished_timestamp}"
+
+            # Reset variables for the next chunk.
             chunk_start_time = 0
             current_text_chunk = ""
 
     return comment_body
 
 
-
 def add_issue_comment_with_confirmation(issue_titles, comment_body):
+    print("Entering add_issue_comment_with_confirmation function")  # Add a print statement here
     issues = repo.get_issues(state="open")
     for issue in issues:
+        print(f"Checking issue: {issue.title}")  # Add a print statement here
         if issue.title.strip() in issue_titles:
             print(f"\nAdding comment to issue '{issue.title}':\n")
             print(comment_body)
@@ -132,6 +149,7 @@ def add_issue_comment_with_confirmation(issue_titles, comment_body):
             else:
                 print("Skipped.")
             break
+
 
 
 
@@ -150,13 +168,11 @@ if __name__ == "__main__":
         
         # Create a new title
         new_title = f'Timecodes for "{title}"'
-
+        print(new_title)
         # Process the transcript for the video
         try:
             transcript = YouTubeTranscriptApi.get_transcript(video_id)
             comment_body = process_transcript(transcript)
+            add_issue_comment_with_confirmation(new_title, comment_body)
         except TranscriptsDisabled:
             print(f"Transcripts disabled for video {video_id}. Skipping...")
-
-        # Add the comment to the issue
-        add_issue_comment_with_confirmation(new_title, comment_body)
