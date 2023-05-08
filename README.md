@@ -7,6 +7,8 @@ It generates timecodes for YouTube videos in a playlist and adds them as comment
 
 You could potentially use it for other playlists.
 
+Please be aware that using OpenAI's API key will incur costs. Using OpenAI's GPT-3.5-turbo model seems cheaper than text-davinci-003. You can easily change it to OpenAI's GPT-3.5-turbo model.
+
 
 ## Dependencies
 
